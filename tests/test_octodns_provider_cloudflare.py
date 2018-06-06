@@ -274,17 +274,27 @@ class TestCloudflareProvider(TestCase):
         wanted.add_record(Record.new(wanted, 'nc', {
             'ttl': 60,  # TTL is below their min
             'type': 'A',
-            'value': '3.2.3.4'
+            'value': '3.2.3.4',
+            'octodns': {
+                'cloudflare': {
+                    'proxied': False
+                }
+            }
         }))
         wanted.add_record(Record.new(wanted, 'ttl', {
             'ttl': 300,  # TTL change
             'type': 'A',
-            'value': '3.2.3.4'
+            'value': '3.2.3.4',
+            'octodns': {
+                'cloudflare': {
+                    'proxied': False
+                }
+            }
         }))
 
         plan = provider.plan(wanted)
         # only see the delete & ttl update, below min-ttl is filtered out
-        self.assertEquals(2, len(plan.changes))
+        self.assertEquals(2, len(plan.changes), plan.changes)
         self.assertEquals(2, provider.apply(plan))
         self.assertTrue(plan.exists)
         # recreate for update, and deletes for the 2 parts of the other
@@ -294,7 +304,8 @@ class TestCloudflareProvider(TestCase):
                  data={'content': '3.2.3.4',
                        'type': 'A',
                        'name': 'ttl.unit.tests',
-                       'ttl': 300}),
+                       'ttl': 300,
+                       'proxied': False}),
             call('DELETE', '/zones/ff12ab34cd5611334422ab3322997650/'
                  'dns_records/fc12ab34cd5611334422ab3322997653'),
             call('DELETE', '/zones/ff12ab34cd5611334422ab3322997650/'
@@ -360,12 +371,22 @@ class TestCloudflareProvider(TestCase):
             'type': 'A',
             # This matches the zone data above, one to swap, one to leave
             'values': ['1.1.1.1', '2.2.2.2'],
+            'octodns': {
+                'cloudflare': {
+                    'proxied': False
+                }
+            },
         })
         new = Record.new(zone, 'a', {
             'ttl': 300,
             'type': 'A',
             # This leaves one, swaps ones, and adds one
             'values': ['2.2.2.2', '3.3.3.3', '4.4.4.4'],
+            'octodns': {
+                'cloudflare': {
+                    'proxied': False
+                }
+            },
         })
         change = Update(existing, new)
         plan = Plan(zone, zone, [change], True)
@@ -378,10 +399,12 @@ class TestCloudflareProvider(TestCase):
             call('PUT', '/zones/ff12ab34cd5611334422ab3322997650/dns_records/'
                  'fc12ab34cd5611334422ab3322997653',
                  data={'content': '4.4.4.4', 'type': 'A', 'name':
-                       'a.unit.tests', 'ttl': 300}),
+                       'a.unit.tests', 'ttl': 300,
+                       'proxied': False}),
             call('POST', '/zones/42/dns_records',
                  data={'content': '3.3.3.3', 'type': 'A',
-                       'name': 'a.unit.tests', 'ttl': 300})
+                       'name': 'a.unit.tests', 'ttl': 300,
+                       'proxied': False})
         ])
 
     def test_update_delete(self):
@@ -502,6 +525,7 @@ class TestCloudflareProvider(TestCase):
         self.assertEquals({
             'content': u'www.unit.tests.',
             'name': 'unit.tests',
+            'proxied': False,
             'ttl': 300,
             'type': 'CNAME'
         }, list(contents)[0])

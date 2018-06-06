@@ -135,7 +135,12 @@ class Record(object):
         self._octodns = data.get('octodns', {})
 
     def _data(self):
-        return {'ttl': self.ttl}
+        data = {'ttl': self.ttl}
+
+        if self._octodns:
+            data['octodns'] = self._octodns
+
+        return data
 
     @property
     def data(self):
@@ -158,6 +163,13 @@ class Record(object):
     @property
     def included(self):
         return self._octodns.get('included', [])
+
+    @property
+    def cloudflare_proxied(self):
+        try:
+            return self._octodns['cloudflare']['proxied']
+        except KeyError:
+            return None
 
     @property
     def healthcheck_host(self):
@@ -190,6 +202,9 @@ class Record(object):
     def changes(self, other, target):
         # We're assuming we have the same name and type if we're being compared
         if self.ttl != other.ttl:
+            return Update(self, other)
+
+        if self.cloudflare_proxied is not other.cloudflare_proxied:
             return Update(self, other)
 
     # NOTE: we're using __hash__ and __cmp__ methods that consider Records
@@ -319,9 +334,10 @@ class _ValuesMixin(object):
     def __repr__(self):
         values = "['{}']".format("', '".join([unicode(v)
                                               for v in self.values]))
-        return '<{} {} {}, {}, {}>'.format(self.__class__.__name__,
+        return '<{} {} {}, {}, {}, {}>'.format(self.__class__.__name__,
                                            self._type, self.ttl,
-                                           self.fqdn, values)
+                                           self.fqdn, values,
+                                           self.cloudflare_proxied)
 
 
 class _GeoMixin(_ValuesMixin):
@@ -448,9 +464,10 @@ class _ValueMixin(object):
         return ret
 
     def __repr__(self):
-        return '<{} {} {}, {}, {}>'.format(self.__class__.__name__,
+        return '<{} {} {}, {}, {}, {}>'.format(self.__class__.__name__,
                                            self._type, self.ttl,
-                                           self.fqdn, self.value)
+                                           self.fqdn, self.value,
+                                           self.cloudflare_proxied)
 
 
 class AliasRecord(_ValueMixin, Record):

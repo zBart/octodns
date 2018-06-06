@@ -775,6 +775,38 @@ class TestRecord(TestCase):
         self.assertEquals('HTTPS', new.healthcheck_protocol)
         self.assertEquals(443, new.healthcheck_port)
 
+    def test_cloudflare_proxied(self):
+        new = Record.new(self.zone, 'a', {
+            'ttl': 44,
+            'type': 'A',
+            'value': '1.2.3.4',
+            'octodns': {
+                'cloudflare': {
+                    'proxied': True,
+                }
+            }
+        })
+        self.assertTrue(new.cloudflare_proxied)
+
+        new = Record.new(self.zone, 'a', {
+            'ttl': 44,
+            'type': 'A',
+            'value': '1.2.3.4',
+            'octodns': {
+                'cloudflare': {
+                    'proxied': False,
+                }
+            }
+        })
+        self.assertFalse(new.cloudflare_proxied)
+
+        new = Record.new(self.zone, 'a', {
+            'ttl': 44,
+            'type': 'A',
+            'value': '1.2.3.4',
+        })
+        self.assertIsNone(new.cloudflare_proxied)
+
     def test_inored(self):
         new = Record.new(self.zone, 'txt', {
             'ttl': 44,

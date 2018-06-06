@@ -115,15 +115,35 @@ class CloudflareProvider(BaseProvider):
         }
 
     def _data_for_multiple(self, _type, records):
+        # Cloudflare supports enabling / disabling 'proxied' for A records with the same name (but different value)
+        # Because OctoDNS uses the fqdn as the key in the yaml, there is no way to store that
+        # For that reason we make sure that either all records are proxied or are not proxied
+        proxied = records[0]['proxied']
+
+        for r in records:
+            if r['proxied'] != proxied:
+                raise CloudflareError('Record {} has a mixed proxied enabled / disabled setting which OctoDNS does not support'.format(records[0]['fqdn']))
+
+        return {
+            'ttl': records[0]['ttl'],
+            'type': _type,
+            'values': [r['content'] for r in records],
+            'octodns': {
+                'cloudflare': {
+                    'proxied': proxied
+                }
+            }
+        }
+
+    _data_for_A = _data_for_multiple
+    _data_for_AAAA = _data_for_multiple
+
+    def _data_for_SPF(self, _type, records):
         return {
             'ttl': records[0]['ttl'],
             'type': _type,
             'values': [r['content'] for r in records],
         }
-
-    _data_for_A = _data_for_multiple
-    _data_for_AAAA = _data_for_multiple
-    _data_for_SPF = _data_for_multiple
 
     def _data_for_TXT(self, _type, records):
         return {
@@ -145,6 +165,19 @@ class CloudflareProvider(BaseProvider):
 
     def _data_for_CNAME(self, _type, records):
         only = records[0]
+
+        if only['proxiable']:
+            return {
+                'ttl': only['ttl'],
+                'type': _type,
+                'value': '{}.'.format(only['content']),
+                'octodns': {
+                    'cloudflare': {
+                        'proxied': only['proxied']
+                    }
+                }
+            }
+
         return {
             'ttl': only['ttl'],
             'type': _type,
@@ -334,11 +367,20 @@ class CloudflareProvider(BaseProvider):
 
         contents_for = getattr(self, '_contents_for_{}'.format(_type))
         for content in contents_for(record):
-            content.update({
-                'name': name,
-                'type': _type,
-                'ttl': ttl,
-            })
+            if record.cloudflare_proxied is None:
+                content.update({
+                    'name': name,
+                    'type': _type,
+                    'ttl': ttl
+                })
+            else:
+                content.update({
+                    'name': name,
+                    'type': _type,
+                    'ttl': ttl,
+                    'proxied': record.cloudflare_proxied
+                })
+
             yield content
 
     def _apply_Create(self, change):
