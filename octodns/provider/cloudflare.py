@@ -189,6 +189,10 @@ class CloudflareProvider(BaseProvider):
     def _data_for_MX(self, _type, records):
         values = []
         for r in records:
+            if 'priority' not in r:
+                self.log.warn('MX with value "%s" does not have a priority, defaulting to priority 1', r['content'])
+                r['priority'] = 1
+
             values.append({
                 'preference': r['priority'],
                 'exchange': '{}.'.format(r['content']),
